@@ -9,7 +9,7 @@
  * disagreed with what the desktop recorded.
  */
 
-const VERSION = 'desk-log-v1';
+const VERSION = 'desk-log-v2';
 const SHELL = [
   '/',
   '/app.css',
@@ -22,6 +22,17 @@ const SHELL = [
 
 /** Reads worth keeping a copy of, so the app opens with something to show. */
 const CACHEABLE_READS = ['/api/state', '/api/day', '/api/history'];
+
+/**
+ * Everything is fetched from the network first, with the cache as the fallback
+ * for when there is none.
+ *
+ * Serving the shell from cache first was a mistake: the page and the scripts
+ * have to agree with each other, and a cached page paired with newer scripts
+ * looks for elements that are not there. Over a connection to a machine on
+ * your own network the network-first round trip costs nothing worth saving,
+ * and it means an updated app is picked up the moment it is published.
+ */
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -45,61 +56,38 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (CACHEABLE_READS.some((path) => url.pathname === path)) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-  event.respondWith(cacheFirst(request));
+  event.respondWith(networkFirst(request));
 });
 
 /** Fresh data when we can get it, the last copy when we cannot. */
 async function networkFirst(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(VERSION);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (error) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    return new Response(
-      JSON.stringify({ ok: false, data: null, error: { message: 'Offline, and nothing saved yet.' } }),
-      { status: 503, headers: { 'content-type': 'application/json' } },
-    );
-  }
-}
+  const url = new URL(request.url);
+  // Look only in this version's cache. `caches.match` without a name searches
+  // every cache the origin has ever held, so a leftover from an older version
+  // could still be served long after it stopped being correct.
+  const cache = await caches.open(VERSION);
 
-/** The shell changes rarely; serve it instantly and refresh in the background. */
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) {
-    refreshInBackground(request);
-    return cached;
-  }
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(VERSION);
-      cache.put(request, response.clone());
-    }
+    if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (error) {
-    const shell = await caches.match('/');
-    if (shell) return shell;
+    const cached = await cache.match(request);
+    if (cached) return cached;
+
+    // A page asked for with no connection and nothing saved: give back the
+    // shell if we have it, so the app opens instead of showing a browser error.
+    if (request.mode === 'navigate') {
+      const shell = await cache.match('/');
+      if (shell) return shell;
+    }
+    if (CACHEABLE_READS.some((path) => url.pathname === path)) {
+      return new Response(
+        JSON.stringify({ ok: false, data: null, error: { message: 'Offline, and nothing saved yet.' } }),
+        { status: 503, headers: { 'content-type': 'application/json' } },
+      );
+    }
     throw error;
   }
 }
 
-function refreshInBackground(request) {
-  fetch(request)
-    .then(async (response) => {
-      if (!response.ok) return;
-      const cache = await caches.open(VERSION);
-      cache.put(request, response);
-    })
-    .catch(() => {
-      /* offline; the cached copy stands */
-    });
-}

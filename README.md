@@ -136,6 +136,10 @@ a stop, a correction on the timeline, a settings change. Writes still go
 through the ordinary POST routes, so there is one path for changing anything
 and the stream only ever carries news outwards.
 
+The app is fetched from the network first, with the cache kept as the offline
+fallback, so a published change is picked up on the next load rather than
+lingering behind a cached copy.
+
 The browser reconnects the stream on its own if it drops. A slow poll every
 minute stays as a safety net in case a stream dies quietly.
 

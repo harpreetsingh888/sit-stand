@@ -206,3 +206,31 @@ listeners that never end.
 **Not redrawing the timeline while a block is selected** is deliberate. An
 incoming change would otherwise wipe a half-typed correction. The timeline
 catches up as soon as the editor is closed.
+
+---
+
+# Service worker was serving a stale shell
+
+The page appeared broken in a browser while `curl` was fine, because `curl`
+does not go through a service worker.
+
+**What went wrong.** The worker served the app shell cache-first under a cache
+name that was never bumped. A browser that installed it early kept handing back
+an `index.html` from before the timeline, conflict banner and queue markup
+existed, so `app.js` looked up elements that were not in the document and threw.
+
+**Two fixes.** Everything same-origin is now fetched network-first with the
+cache as the offline fallback: over a connection to a machine on your own
+network the round trip costs nothing worth saving, and it means a published
+change is picked up immediately. And the fallback lookups are scoped to the
+current cache — `caches.match` without a name searches every cache the origin
+has ever held, so a leftover entry from an older version could still be served
+long after it stopped being correct.
+
+**Verified** by seeding a stale entry under the old cache name and confirming
+the page loads real content and never reaches for it.
+
+**Rule.** A cache-first shell needs a versioning discipline to go with it. If
+there is no build step producing content-hashed filenames, do not cache the
+shell first — the page and its scripts have to agree, and cache-first is how
+they stop agreeing.
