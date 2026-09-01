@@ -173,3 +173,36 @@ instead of a zero-length row.
 place, which is what iOS requires before push can be requested at all, but the
 subscription handling and a push endpoint are still to write. Nudges currently
 fire only on a device with the page open.
+
+---
+
+# Live updates between devices
+
+- [x] `lib/events.js` — a broadcaster holding one stream per open page
+- [x] `GET /api/events`, sending the current state on connect
+- [x] Every mutating route announces the new state
+- [x] `EventSource` in the page, with the poll dropped to a once-a-minute net
+- [x] `HOST` accepts several addresses, so one process can answer a proxy and
+      a private interface at once
+
+## Review
+
+171 tests. Push latency measured in a real browser through the Tailscale HTTPS
+proxy: 9, 14 and 13 milliseconds for three consecutive switches.
+
+**Why events and not sockets.** The need is one-directional: the server is the
+only thing that knows a switch happened, and writes already have a perfectly
+good POST route. Server-sent events are built into the browser, reconnect by
+themselves, and are plain HTTP so they pass through `tailscale serve` without
+any configuration. A WebSocket would have meant hand-writing the handshake and
+frame encoding to keep the project dependency-free, for a channel back that
+nothing needs.
+
+**Two things that would have bitten in production.** The stream sockets need
+their timeout cleared or Node closes them out from under a quiet connection.
+And they have to be released on shutdown, or `server.close()` waits forever on
+listeners that never end.
+
+**Not redrawing the timeline while a block is selected** is deliberate. An
+incoming change would otherwise wipe a half-typed correction. The timeline
+catches up as soon as the editor is closed.

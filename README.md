@@ -127,6 +127,22 @@ Your Mac is the server, so the tracker is available whenever the Mac is awake.
 That is the same window in which it has anything to record, and the working day
 closes itself off if the Mac sleeps through the end of it.
 
+### Both devices stay in step
+
+A switch made anywhere shows up everywhere within a few milliseconds, without
+a reload. The page holds a server-sent events stream open to `/api/events`;
+the server pushes the new state down it whenever anything changes — a toggle,
+a stop, a correction on the timeline, a settings change. Writes still go
+through the ordinary POST routes, so there is one path for changing anything
+and the stream only ever carries news outwards.
+
+The browser reconnects the stream on its own if it drops. A slow poll every
+minute stays as a safety net in case a stream dies quietly.
+
+One deliberate exception: if you have a block selected in the timeline editor,
+an incoming change does not redraw it, because that would throw away whatever
+you were half way through typing.
+
 ### When the phone has no signal
 
 A switch made with no connection is kept on the phone, with the time you made
@@ -151,7 +167,7 @@ a session left running overnight only ever counts its in-hours portion.
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `4321` | Port to listen on |
-| `HOST` | `127.0.0.1` | Interface to bind. The default keeps it on this machine |
+| `HOST` | `127.0.0.1` | Interface(s) to bind, comma-separated. The default keeps it on this machine |
 | `SIT_STAND_DB` | `./data/sit-stand.db` | Where the database lives |
 
 ## Getting your data out
@@ -198,11 +214,11 @@ The older hand-written version, for reference:
 
     npm test
 
-A hundred and sixty-two tests across nine suites: the clipping and aggregation maths
+A hundred and seventy-one tests across ten suites: the clipping and aggregation maths
 (including days that cross midnight, weekends, and daylight-saving changes),
 settings validation, the database invariants and schema migration, editing
 sessions, the working day starting and stopping by itself, reconciling a
-phone's queued switches, and the HTTP API. The menu bar app and the auto-away agent are
+phone's queued switches, the live event stream, and the HTTP API. The menu bar app and the auto-away agent are
 verified by running them rather than by unit tests.
 
 ## How it is put together
@@ -215,6 +231,7 @@ verified by running them rather than by unit tests.
 | `lib/day.js` | One day as blocks, with the ones that look too long flagged |
 | `lib/worktime.js` | Closing off a working day that has finished |
 | `lib/sync.js` | Deciding whether a queued switch fits or disagrees |
+| `lib/events.js` | Pushing changes to every open page |
 | `lib/postures.js` | The list of postures, shared by storage, stats and the API |
 | `lib/stats.js` | Clipping sessions to working hours and totalling them. Pure |
 | `lib/settings.js` | Defaults and cross-field validation. Pure |
