@@ -1,0 +1,14 @@
+{
+  "name": "sit-stand",
+  "version": "1.0.0",
+  "description": "Track how much of the working day is spent sitting versus standing.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "TZ=Europe/London node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

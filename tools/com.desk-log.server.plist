@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.desk-log.server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>NODE_PATH_HERE</string>
+    <string>--disable-warning=ExperimentalWarning</string>
+    <string>PROJECT_PATH_HERE/server.js</string>
+  </array>
+  <key>WorkingDirectory</key><string>PROJECT_PATH_HERE</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/desk-log-server.log</string>
+  <key>StandardErrorPath</key><string>/tmp/desk-log-server.log</string>
+</dict>
+</plist>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Desk log — sit / stand</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230E1319'/%3E%3Crect x='2' y='5' width='12' height='1.6' fill='%23F2A33C'/%3E%3Crect x='3.4' y='6.6' width='1.4' height='5.4' fill='%236E93B8'/%3E%3Crect x='11.2' y='6.6' width='1.4' height='5.4' fill='%236E93B8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0E1319">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Desk Log">
+</head>
+<body>
+<div class="frame">
+
+  <header class="bar">
+    <div class="mark">Desk log</div>
+    <div class="bar-meta" id="windowLabel">Loading</div>
+  </header>
+
+  <section class="notice conflict" id="conflicts" hidden aria-label="Disagreements to settle"></section>
+
+  <p class="notice" id="offline" hidden role="alert">
+    Can't reach the tracker. Check that <code>node server.js</code> is still running.
+  </p>
+
+  <main>
+    <section class="stage" id="stage" data-posture="none" aria-labelledby="postureLabel">
+      <div class="rig" id="rig">
+        <p class="posture" id="postureLabel">Not tracking</p>
+        <p class="readout" id="readout">--:--:--</p>
+        <p class="overdue" id="overdue" hidden></p>
+      </div>
+    </section>
+
+    <div class="controls" id="controls"></div>
+    <p class="queued" id="queued" hidden></p>
+    <p aria-live="polite" class="sr" id="announce"></p>
+
+    <div class="row">
+      <section class="panel">
+        <h2>Standing goal</h2>
+        <svg class="gauge" id="gauge" viewBox="0 0 200 114" role="img" aria-labelledby="gaugeValue"></svg>
+        <p class="gauge-value" id="gaugeValue">0m</p>
+        <p class="gauge-note" id="gaugeNote">of 2h</p>
+      </section>
+
+      <section class="panel">
+        <h2>Today</h2>
+        <div class="split" id="split" role="img" aria-label="Today's split between sitting and standing"></div>
+        <dl class="legend">
+          <div class="k-sit"><dt>Sitting</dt><dd id="sitTotal">0m</dd></div>
+          <div class="k-stand"><dt>Standing</dt><dd id="standTotal">0m</dd></div>
+          <div class="k-away"><dt>Away</dt><dd id="awayTotal">0m</dd></div>
+        </dl>
+        <p class="share" id="share">Nothing tracked yet today.</p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Today, block by block</h2>
+      <p class="suspect-note" id="suspectNote" hidden></p>
+      <div id="timeline"></div>
+      <div id="timelineEditor"></div>
+      <p class="editor-error" id="editorError" hidden role="alert"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Last 14 days</h2>
+      <div class="chart" id="chart"></div>
+      <div class="axis" id="axis"></div>
+      <p class="trend" id="trend"></p>
+    </section>
+
+    <details class="panel" id="settingsPanel">
+      <summary>Settings</summary>
+      <div class="settings-body">
+        <form id="settingsForm" novalidate>
+          <div class="pair">
+            <div class="field">
+              <label for="workStart">Work starts</label>
+              <input type="time" id="workStart" name="workStart" required>
+              <p class="field-error" data-error-for="workStart" hidden></p>
+            </div>
+            <div class="field">
+              <label for="workEnd">Work ends</label>
+              <input type="time" id="workEnd" name="workEnd" required>
+              <p class="field-error" data-error-for="workEnd" hidden></p>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field-label" id="daysLabel">Working days</span>
+            <div class="days" id="days" role="group" aria-labelledby="daysLabel"></div>
+            <p class="field-error" data-error-for="workDays" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="standGoalMinutes">Standing goal, in minutes a day</label>
+            <input type="number" id="standGoalMinutes" name="standGoalMinutes" min="1" step="1">
+            <p class="field-error" data-error-for="standGoalMinutes" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="implausibleAfterMinutes">Flag any block longer than</label>
+            <input type="number" id="implausibleAfterMinutes" name="implausibleAfterMinutes"
+                   min="30" max="1440" step="1">
+            <p class="field-error" data-error-for="implausibleAfterMinutes" hidden></p>
+          </div>
+
+          <div class="pair">
+            <div class="field">
+              <label for="sitNudgeMinutes">Nudge me after sitting for</label>
+              <input type="number" id="sitNudgeMinutes" name="sitNudgeMinutes" min="1" max="480" step="1">
+              <p class="field-error" data-error-for="sitNudgeMinutes" hidden></p>
+            </div>
+            <div class="field">
+              <label for="standNudgeMinutes">Nudge me after standing for</label>
+              <input type="number" id="standNudgeMinutes" name="standNudgeMinutes" min="1" max="480" step="1">
+              <p class="field-error" data-error-for="standNudgeMinutes" hidden></p>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <button type="submit">Save settings</button>
+            <button type="button" class="quiet" id="notifyButton" hidden>Turn on nudges</button>
+            <span class="saved" id="savedNote" hidden>Settings saved.</span>
+          </div>
+        </form>
+      </div>
+    </details>
+
+    <p class="foot">
+      Sessions are stored on this machine.
+      <a href="/api/export.csv" download>Download everything as CSV</a>
+    </p>
+  </main>
+</div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

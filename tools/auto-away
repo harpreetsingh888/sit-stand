@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# Mark yourself away while the Mac is locked, and put you back afterwards.
+#
+# The posture you were in is remembered before going away, so unlocking
+# restores it rather than guessing. Nothing is recorded while the tracker is
+# unreachable; the next poll picks things up again.
+#
+# Run it under launchd; see tools/com.desk-log.auto-away.plist.
+
+set -u
+
+BASE_URL="${DESK_LOG_URL:-http://127.0.0.1:4321}"
+INTERVAL="${DESK_LOG_POLL_SECONDS:-10}"
+STATE_DIR="${TMPDIR:-/tmp}"
+RESUME_FILE="$STATE_DIR/desk-log-resume-posture"
+
+log() { printf '%s auto-away: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
+
+# The lock flag only exists while the screen is actually locked.
+# DESK_LOG_LOCK_PROBE replaces the detection with a command printing
+# "locked" or "unlocked", which is how this script gets tested.
+screen_is_locked() {
+  if [ -n "${DESK_LOG_LOCK_PROBE:-}" ]; then
+    eval "$DESK_LOG_LOCK_PROBE"
+    return
+  fi
+  ioreg -n Root -d1 -a 2>/dev/null | python3 -c '
+import sys, plistlib
+try:
+    root = plistlib.loads(sys.stdin.buffer.read())
+    users = root.get("IOConsoleUsers") or []
+    print("locked" if any(u.get("CGSSessionScreenIsLocked") for u in users) else "unlocked")
+except Exception:
+    print("unknown")
+'
+}
+
+current_posture() {
+  curl -sf -m 4 "$BASE_URL/api/state" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    session = json.load(sys.stdin)["data"]["session"]
+    print(session["posture"] if session else "none")
+except Exception:
+    print("unreachable")
+'
+}
+
+set_posture() {
+  curl -sf -m 4 -X POST -H "content-type: application/json" \
+    -d "{\"posture\":\"$1\"}" "$BASE_URL/api/toggle" >/dev/null 2>&1
+}
+
+# The menu bar app watches sleep, wake, lock and unlock natively. If it is
+# running, two watchers would fight over the same posture, so stand down.
+if pgrep -x DeskLog >/dev/null 2>&1; then
+  log "the menu bar app is running and already handles this; exiting"
+  exit 0
+fi
+
+log "watching $BASE_URL every ${INTERVAL}s"
+was_locked=""
+
+while true; do
+  locked=$(screen_is_locked)
+
+  if [ "$locked" != "$was_locked" ] && [ "$locked" != "unknown" ]; then
+    posture=$(current_posture)
+
+    if [ "$locked" = "locked" ]; then
+      # Only step away from a desk posture, and only if something is running.
+      case "$posture" in
+        sit|stand)
+          printf '%s' "$posture" > "$RESUME_FILE"
+          if set_posture away; then
+            log "screen locked while $posture; marked away"
+          else
+            log "screen locked but the tracker did not answer"
+          fi
+          ;;
+        *) log "screen locked; nothing to do (posture: $posture)" ;;
+      esac
+    else
+      # Coming back: restore whatever was interrupted, if we are still away.
+      resume=$(cat "$RESUME_FILE" 2>/dev/null || printf 'sit')
+      case "$posture" in
+        away)
+          if set_posture "$resume"; then
+            log "screen unlocked; back to $resume"
+          else
+            log "screen unlocked but the tracker did not answer"
+          fi
+          ;;
+        *) log "screen unlocked; leaving posture as $posture" ;;
+      esac
+    fi
+
+    was_locked="$locked"
+  fi
+
+  sleep "$INTERVAL"
+done
